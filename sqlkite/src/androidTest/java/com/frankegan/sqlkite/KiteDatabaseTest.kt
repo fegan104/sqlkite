@@ -623,8 +623,8 @@ class KiteDatabaseTest {
     fun executeInsertAndTrigger() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
-                + "VALUES ('Chad Chadson', 'chad')"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
+                    + "VALUES ('Chad Chadson', 'chad')"
         )
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
@@ -647,8 +647,8 @@ class KiteDatabaseTest {
     fun executeInsertAndDontTrigger() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT OR IGNORE INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
-                + "VALUES ('Alice Allison', 'alice')"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
+                    + "VALUES ('Alice Allison', 'alice')"
         )
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
@@ -664,8 +664,8 @@ class KiteDatabaseTest {
     fun executeInsertAndTriggerMultipleTables() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
-                + "VALUES ('Chad Chadson', 'chad')"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
+                    + "VALUES ('Chad Chadson', 'chad')"
         )
         val managerObserver = db.createQuery(TestDb.TABLE_MANAGER, TestDb.SELECT_MANAGER_LIST)
         managerObserver.test {
@@ -706,8 +706,8 @@ class KiteDatabaseTest {
     fun executeInsertAndTriggerNoTables() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
-                + "VALUES ('Chad Chadson', 'chad')"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
+                    + "VALUES ('Chad Chadson', 'chad')"
         )
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
@@ -723,8 +723,8 @@ class KiteDatabaseTest {
     fun executeInsertThrowsAndDoesNotTrigger() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
-                + "VALUES ('Alice Allison', 'alice')"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
+                    + "VALUES ('Alice Allison', 'alice')"
         )
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .drop(1) // Skip initial
@@ -741,7 +741,7 @@ class KiteDatabaseTest {
     fun executeInsertWithArgsAndTrigger() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") VALUES (?, ?)"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") VALUES (?, ?)"
         )
         statement.bindString(1, "Chad Chadson")
         statement.bindString(2, "chad")
@@ -765,7 +765,7 @@ class KiteDatabaseTest {
     fun executeInsertWithArgsThrowsAndDoesNotTrigger() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
-                + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") VALUES (?, ?)"
+                    + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") VALUES (?, ?)"
         )
         statement.bindString(1, "Alice Aliison")
         statement.bindString(2, "alice")
@@ -809,9 +809,9 @@ class KiteDatabaseTest {
     fun executeUpdateDeleteAndDontTrigger() = runBlockingTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             ""
-                + "UPDATE " + TestDb.TABLE_EMPLOYEE
-                + " SET " + TestDb.EmployeeTable.NAME + " = 'Zach'"
-                + " WHERE " + TestDb.EmployeeTable.NAME + " = 'Rob'"
+                    + "UPDATE " + TestDb.TABLE_EMPLOYEE
+                    + " SET " + TestDb.EmployeeTable.NAME + " = 'Zach'"
+                    + " WHERE " + TestDb.EmployeeTable.NAME + " = 'Rob'"
         )
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
@@ -1003,6 +1003,27 @@ class KiteDatabaseTest {
     }
 
     @Test
+    fun cancelledWithTransactionRollsBackAndReleasesConnection() = runBlocking {
+        val inserted = CompletableDeferred<Unit>()
+        val transaction = launch {
+            db.withTransaction {
+                db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
+                inserted.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        inserted.await()
+        transaction.cancelAndJoin()
+
+        // A leaked transaction blocks this read forever inside SQLiteConnectionPool, so run it
+        // outside this scope where runBlocking won't wait on it and the timeout can still fire.
+        val employeeCount = CoroutineScope(Dispatchers.IO).async {
+            db.query(TestDb.SELECT_EMPLOYEES).use { cursor -> cursor.count }
+        }
+        Truth.assertThat(withTimeoutOrNull(5_000) { employeeCount.await() }).isEqualTo(3)
+    }
+
+    @Test
     fun synchronousQueryDuringTransaction() = runBlocking {
         db.withTransaction {
             db.query(TestDb.SELECT_EMPLOYEES)
@@ -1145,6 +1166,7 @@ class KiteDatabaseTest {
                 launch(dispatcher1) {
                     db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
                 }
+                delay(100)
                 launch(dispatcher2) {
                     db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("nick", "Nick Nickers"))
                 }
