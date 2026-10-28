@@ -66,7 +66,8 @@ class SqlKite internal constructor(
      * automatic notifications of table changes to work. See [the][KiteDatabase.createQuery] for more information on that behavior.
      *
      * @param dispatcher The [CoroutineDispatcher] on which items from [KiteDatabase.createQuery]
-     * will be emitted.
+     * will be emitted, and on which [mapToOne], [mapToOneOrDefault], [mapToList] and [asRows] run
+     * those queries and read their cursors.
      */
     @CheckResult
     fun wrapDatabaseHelper(
@@ -96,6 +97,13 @@ class SqlKite internal constructor(
         @CheckResult
         @WorkerThread
         suspend fun run(): Cursor?
+
+        /**
+        +         * Where [mapToOne], [mapToOneOrDefault], [mapToList] and [asRows] call [run] and read the
+        +         * cursor. `null` leaves that work on the collector's dispatcher.
+        +         */
+        val dispatcher: CoroutineDispatcher?
+            get() = null
     }
 
     /** A simple indirection for logging debug messages.  */

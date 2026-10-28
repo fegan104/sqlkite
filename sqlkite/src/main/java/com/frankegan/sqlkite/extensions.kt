@@ -27,6 +27,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.resume
 
 /**
@@ -44,10 +45,13 @@ inline fun <T> Flow<Query>.mapToOne(noinline mapper: (Cursor) -> T): Flow<T> {
     return transform { query ->
         var item: T? = null
 
-        query.run().use { cursor ->
-            if (cursor?.moveToNext() == true) {
-                item = mapper(cursor)
-                check(!cursor.moveToNext()) { "Cursor returned more than 1 row" }
+        query.checkCollectorNotInTransaction()
+        withContext(query.readContext) {
+            query.run().use { cursor ->
+                if (cursor?.moveToNext() == true) {
+                    item = mapper(cursor)
+                    check(!cursor.moveToNext()) { "Cursor returned more than 1 row" }
+                }
             }
         }
 
@@ -55,6 +59,20 @@ inline fun <T> Flow<Query>.mapToOne(noinline mapper: (Cursor) -> T): Flow<T> {
             emit(it)
         }
     }
+}
+
+@PublishedApi
+internal val Query.readContext: CoroutineContext
+    get() = dispatcher ?: EmptyCoroutineContext
+
+/**
+ * Must run on the collector's thread, before switching to [readContext]. A blocking transaction
+ * held by the collector's thread is invisible from the dispatcher's thread, where [Query.run]
+ * would wait forever for the connection that transaction holds.
+ */
+@PublishedApi
+internal fun Query.checkCollectorNotInTransaction() {
+    if (this is KiteDatabase.DatabaseQuery) checkNotInTransaction()
 }
 
 /**
@@ -91,7 +109,7 @@ fun <T : Any> Query.asRows(
                 emit(mapper(cursor))
             }
         }
-    }
+    }.flowOn(readContext).onStart { checkCollectorNotInTransaction() }
 }
 
 /**
@@ -110,10 +128,13 @@ inline fun <T> Flow<Query>.mapToOneOrDefault(defaultValue: T, noinline mapper: (
     return transform { query ->
         var item: T? = null
 
-        query.run()?.use { cursor ->
-            if (cursor.moveToNext()) {
-                item = mapper(cursor)
-                check(!cursor.moveToNext()) { "Cursor returned more than 1 row" }
+        query.checkCollectorNotInTransaction()
+        withContext(query.readContext) {
+            query.run()?.use { cursor ->
+                if (cursor.moveToNext()) {
+                    item = mapper(cursor)
+                    check(!cursor.moveToNext()) { "Cursor returned more than 1 row" }
+                }
             }
         }
 
@@ -136,9 +157,12 @@ inline fun <T> Flow<Query>.mapToList(noinline mapper: (Cursor) -> T): Flow<List<
     return transform { query ->
         val items = mutableListOf<T>()
 
-        query.run()?.use { cursor ->
-            while (cursor.moveToNext()) {
-                items += mapper(cursor)
+        query.checkCollectorNotInTransaction()
+        withContext(query.readContext) {
+            query.run()?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    items += mapper(cursor)
+                }
             }
         }
 

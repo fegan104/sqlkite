@@ -675,7 +675,7 @@ class KiteDatabase internal constructor(
         SQLiteDatabase.CONFLICT_REPLACE,
         SQLiteDatabase.CONFLICT_ROLLBACK
     )
-    @kotlin.annotation.Retention(AnnotationRetention.SOURCE)
+    @Retention(AnnotationRetention.SOURCE)
     private annotation class ConflictAlgorithm
 
     private fun log(message: String, vararg args: Any?) {
@@ -691,7 +691,7 @@ class KiteDatabase internal constructor(
 
         var commit = false
         override fun onBegin() {
-           listener?.onBegin()
+            listener?.onBegin()
         }
 
         override fun onCommit() {
@@ -714,13 +714,20 @@ class KiteDatabase internal constructor(
         private val query: SupportSQLiteQuery
     ) : SqlKite.Query {
 
+        override val dispatcher: CoroutineDispatcher
+            get() = queryDispatcher
+
         override suspend fun run(): Cursor {
-            check(!inSuspendingTransaction) { "Cannot execute observable query in a transaction." }
+            checkNotInTransaction()
             val cursor: Cursor = readableDatabase.query(query)
             if (logging) {
                 log("QUERY\n  tables: %s\n  sql: %s", tables, indentSql(query.sql))
             }
             return cursor
+        }
+
+        fun checkNotInTransaction() {
+            check(!inSuspendingTransaction) { "Cannot execute observable query in a transaction." }
         }
 
         override fun toString(): String {
