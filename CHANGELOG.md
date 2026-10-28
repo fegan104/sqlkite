@@ -2,7 +2,14 @@ Change Log
 ==========
 
 
-Version 4.3.2 *(2026-10-28)*
+Version 4.4.0 *(2026-10-28)*
+----------------------------
+
+ * added a new blocking `runInTransaction` method for a better non coroutine transactions api.
+ * Changed the implementation of the Query extension functions to run on the dispatcher provided when wrapping the SupportSQLiteDatabase.
+ 
+ 
+ Version 4.3.2 *(2026-10-28)*
 ----------------------------
 
  * Fixed a bug that allowed suspending transactions to get stuck if the coroutine was canceled before `endTransaction()` could be called.
