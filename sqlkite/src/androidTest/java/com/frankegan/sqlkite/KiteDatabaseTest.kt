@@ -20,6 +20,7 @@ import android.content.ContentValues
 import android.database.SQLException
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
+import android.database.sqlite.SQLiteTransactionListener
 import android.os.Build
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -1022,6 +1023,98 @@ class KiteDatabaseTest {
         }
         Truth.assertThat(withTimeoutOrNull(5_000) { employeeCount.await() }).isEqualTo(3)
     }
+
+    @Test
+    fun runInTransactionSendsHeldTriggersOnceAfterCommit() = runBlocking {
+        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
+            awaitItemAndRunQuery()
+                .hasRow("alice", "Alice Allison")
+                .hasRow("bob", "Bob Bobberson")
+                .hasRow("eve", "Eve Evenson")
+                .isExhausted()
+
+            db.runInTransaction {
+                real.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
+                db.sendTableTrigger(TestDb.TABLE_EMPLOYEE)
+                real.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("nick", "Nick Nickers"))
+                db.sendTableTrigger(TestDb.TABLE_EMPLOYEE)
+            }
+
+            awaitItemAndRunQuery()
+                .hasRow("alice", "Alice Allison")
+                .hasRow("bob", "Bob Bobberson")
+                .hasRow("eve", "Eve Evenson")
+                .hasRow("john", "John Johnson")
+                .hasRow("nick", "Nick Nickers")
+                .isExhausted()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun runInTransactionDropsHeldTriggersOnRollback() = runBlocking {
+        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
+            awaitItemAndRunQuery().close()
+
+            try {
+                db.runInTransaction {
+                    real.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
+                    db.sendTableTrigger(TestDb.TABLE_EMPLOYEE)
+                    throw IllegalStateException("rollback")
+                }
+            } catch (expected: IllegalStateException) {
+            }
+
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun runInTransactionInsideWithTransactionHandsTriggersToOuter() = runBlocking {
+        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
+            awaitItemAndRunQuery().close()
+
+            try {
+                db.withTransaction {
+                    db.runInTransaction {
+                        real.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
+                        db.sendTableTrigger(TestDb.TABLE_EMPLOYEE)
+                    }
+                    throw IllegalStateException("rollback outer")
+                }
+            } catch (expected: IllegalStateException) {
+            }
+
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun runInTransactionForwardsListenerCallbacks() {
+        val events = mutableListOf<String>()
+        val listener = object : SQLiteTransactionListener {
+            override fun onBegin() {
+                events += "begin"
+            }
+
+            override fun onCommit() {
+                events += "commit"
+            }
+
+            override fun onRollback() {
+                events += "rollback"
+            }
+        }
+
+        db.runInTransaction(listener) { }
+        try {
+            db.runInTransaction(listener) { throw IllegalStateException("rollback") }
+        } catch (expected: IllegalStateException) {
+        }
+
+        Truth.assertThat(events).containsExactly("begin", "commit", "begin", "rollback").inOrder()
+    }
+
 
     @Test
     fun synchronousQueryDuringTransaction() = runBlocking {

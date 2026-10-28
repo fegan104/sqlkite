@@ -52,8 +52,8 @@ class KiteDatabase internal constructor(
     private val triggers = MutableSharedFlow<Set<String>>(extraBufferCapacity = 1)
 
     /**
-     * True if the underlying database is in a transaction
-     * or if we are still in a transaction for suspending functions.
+     * True if the underlying database is in a transaction or if we are still in a transaction
+     * started by [withTransaction] or [runInTransaction].
      */
     val inSuspendingTransaction: Boolean
         get() = suspendingTransactions.get() != null || readableDatabase.inTransaction()
@@ -586,6 +586,42 @@ class KiteDatabase internal constructor(
         block
     )
 
+    /**
+     * Runs [block] in an exclusive transaction on the calling thread, blocking until it ends.
+     * Table triggers sent during [block] are held until the outermost transaction commits and
+     * dropped if it rolls back, the same as [withTransaction]. Nests inside a [withTransaction]
+     * or [runInTransaction] already running on this thread.
+     *
+     * @param listener also receives this transaction's begin, commit and rollback callbacks.
+     */
+    @WorkerThread
+    @JvmOverloads
+    fun <R> runInTransaction(listener: SQLiteTransactionListener? = null, block: () -> R): R {
+        val parent = suspendingTransactions.get()
+        val transaction = SqliteTransaction(parent, listener)
+        suspendingTransactions.set(transaction)
+        val result = try {
+            if (logging) log("TXN BEGIN %s", transaction)
+            writableDatabase.beginTransactionWithListener(transaction)
+            try {
+                block().also { writableDatabase.setTransactionSuccessful() }
+            } finally {
+                if (logging) log("TXN END %s", transaction)
+                writableDatabase.endTransaction()
+            }
+        } finally {
+            suspendingTransactions.set(parent)
+        }
+        if (transaction.commit) {
+            if (parent != null) {
+                parent.addAll(transaction)
+            } else {
+                emitTableTrigger(transaction)
+            }
+        }
+        return result
+    }
+
     private suspend fun <R> withTransaction(
         beginStatement: SupportSQLiteDatabase.(SQLiteTransactionListener?) -> Unit,
         block: suspend () -> R
@@ -648,15 +684,25 @@ class KiteDatabase internal constructor(
         )
     }
 
-    private class SqliteTransaction(val parent: SqliteTransaction?) : LinkedHashSet<String>(), SQLiteTransactionListener {
+    private class SqliteTransaction(
+        val parent: SqliteTransaction?,
+        private val listener: SQLiteTransactionListener? = null
+    ) : LinkedHashSet<String>(), SQLiteTransactionListener {
 
         var commit = false
-        override fun onBegin() {}
-        override fun onCommit() {
-            commit = true
+        override fun onBegin() {
+           listener?.onBegin()
         }
 
-        override fun onRollback() {}
+        override fun onCommit() {
+            commit = true
+            listener?.onCommit()
+        }
+
+        override fun onRollback() {
+            listener?.onRollback()
+        }
+
         override fun toString(): String {
             val name = String.format("%08x", System.identityHashCode(this))
             return if (parent == null) name else "$name [$parent]"
