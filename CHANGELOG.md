@@ -2,7 +2,13 @@ Change Log
 ==========
 
 
-Version 4.3.1 *(2022-06-27)*
+Version 4.3.2 *(2026-10-28)*
+----------------------------
+
+ * Fixed a bug that allowed suspending transactions to get stuck if the coroutine was canceled before `endTransaction()` could be called.
+ 
+ 
+ Version 4.3.1 *(2022-06-27)*
 ----------------------------
 
  * Updated to add a new convenience method fo table triggers.
