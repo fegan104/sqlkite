@@ -137,9 +137,13 @@ class KiteDatabase internal constructor(
         if (suspendingTransaction != null) {
             suspendingTransaction.addAll(tables)
         } else {
-            if (logging) log("TRIGGER %s", tables)
-            triggers.tryEmit(tables)
+            emitTableTrigger(tables)
         }
+    }
+
+    private fun emitTableTrigger(tables: Set<String>) {
+        if (logging) log("TRIGGER %s", tables)
+        triggers.tryEmit(tables)
     }
 
     /**
@@ -605,14 +609,18 @@ class KiteDatabase internal constructor(
                         return@startTransaction result
                     } finally {
                         //end()
-                        val transaction: SqliteTransaction = suspendingTransactions.get() ?: throw IllegalStateException("Not in transaction.")
-                        val newTransaction = transaction.parent
-                        withContext(suspendingTransactions.asContextElement(newTransaction)) {
-                            if (logging) log("TXN END %s", transaction)
-                            writableDatabase.endTransaction()
-                            // Send the triggers after ending the transaction in the DB if the transaction was successful.
-                            if (transaction.commit) {
-                                sendTableTrigger(transaction)
+                        // Nothing here may suspend: when the caller is canceled, any suspend call
+                        // throws before endTransaction runs and the transaction thread goes back to
+                        // the pool still holding the connection.
+                        if (logging) log("TXN END %s", transactionAtStart)
+                        writableDatabase.endTransaction()
+                        // Send the triggers after ending the transaction in the DB if the transaction was successful.
+                        if (transactionAtStart.commit) {
+                            val parent = transactionAtStart.parent
+                            if (parent != null) {
+                                parent.addAll(transactionAtStart)
+                            } else {
+                                emitTableTrigger(transactionAtStart)
                             }
                         }
                     }
