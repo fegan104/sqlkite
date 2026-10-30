@@ -18,83 +18,94 @@ package com.frankegan.sqlkite
 import android.content.ContentProvider
 import android.content.ContentResolver
 import android.content.ContentValues
+import android.content.Context
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import androidx.test.core.app.ActivityScenario.launch
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.provider.ProviderTestRule
 import app.cash.turbine.test
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.runBlockingTest
+import org.junit.Assert
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 
 class KiteContentResolverTest {
 
-    private val dispatcher = TestCoroutineDispatcher()
     private val killSwitch = MutableStateFlow(false)
 
-    @get:Rule
-    val providerRule: ProviderTestRule = ProviderTestRule
-        .Builder(TestContentProvider::class.java, AUTHORITY.authority!!)
-        .build()
+    val appContext: Context = ApplicationProvider.getApplicationContext()
+    val provider = TestContentProvider().apply {
+        attachInfo(appContext, null)
+    }
 
     private val contentResolver: ContentResolver
-        get() = providerRule.resolver
+        get() = provider.contentResolver
 
-//    TODO Find a content resolver testing library that works
-//    @Test
-//    fun testCreateQueryObservesInsert() = runBlockingTest {
-//        contentResolver.observeQuery(TABLE).flowOn(dispatcher).test {
-//            awaitItemAndRunQuery().isExhausted()
-//            val insertedUri = contentResolver.insert(TABLE, values("key1", "val1"))
-//            contentResolver.notifyChange(insertedUri!!, null)
-//            awaitItemAndRunQuery()
-//                .hasRow("key1", "val1")
-//                .isExhausted()
-//        }
-//    }
-
-//    TODO Find a content resolver testing library that works
-//    @Test
-//    fun testCreateQueryObservesUpdate() = runBlockingTest {
-//        contentResolver.insert(TABLE, values("key1", "val1"))
-//        contentResolver.observeQuery(TABLE).flowOn(dispatcher).test {
-//            awaitItemAndRunQuery().hasRow("key1", "val1").isExhausted()
-//            contentResolver.update(TABLE, values("key1", "val2"), null, null)
-//            awaitItemAndRunQuery().hasRow("key1", "val2").isExhausted()
-//        }
-//    }
-
-//    TODO Find a content resolver testing library that works
-//    @Test
-//    fun testCreateQueryObservesDelete() = runBlockingTest {
-//        contentResolver.insert(TABLE, values("key1", "val1"))
-//        contentResolver.observeQuery(TABLE).flowOn(dispatcher).test {
-//            awaitItemAndRunQuery().hasRow("key1", "val1").isExhausted()
-//            contentResolver.delete(TABLE, null, null)
-//            awaitItemAndRunQuery().isExhausted()
-//        }
-//    }
+    @Before
+    fun setUp() {
+        contentResolver.delete(TABLE, null, null)
+        killSwitch.value = false
+    }
 
     @Test
-    fun testUnsubscribeDoesNotTrigger() = runBlockingTest {
+    fun testCreateQueryObservesInsert() = runBlocking {
+        contentResolver.observeQuery(TABLE).test {
+            awaitItemAndRunQuery().isExhausted()
+            val insertedUri = contentResolver.insert(TABLE, values("key1", "val1"))
+            contentResolver.notifyChange(insertedUri!!, null)
+            awaitItemAndRunQuery()
+                .hasRow("key1", "val1")
+                .isExhausted()
+        }
+    }
+
+    @Test
+    fun testCreateQueryObservesUpdate() = runBlocking {
+        contentResolver.insert(TABLE, values("key1", "val1"))
+        contentResolver.observeQuery(TABLE).test {
+            awaitItemAndRunQuery().hasRow("key1", "val1").isExhausted()
+            contentResolver.update(TABLE, values("key1", "val2"), null, null)
+            awaitItemAndRunQuery().hasRow("key1", "val2").isExhausted()
+        }
+    }
+
+    @Test
+    fun testCreateQueryObservesDelete() = runBlocking {
+        contentResolver.insert(TABLE, values("key1", "val1"))
+        contentResolver.observeQuery(TABLE).test {
+            awaitItemAndRunQuery().hasRow("key1", "val1").isExhausted()
+            contentResolver.delete(TABLE, null, null)
+            awaitItemAndRunQuery().isExhausted()
+        }
+    }
+
+    @Test
+    fun testUnsubscribeDoesNotTrigger() = runBlocking<Unit> {
         val queryCollector = launch {
-            contentResolver.observeQuery(TABLE).flowOn(dispatcher).test {
+            contentResolver.observeQuery(TABLE).test {
                 awaitItemAndRunQuery().isExhausted()
             }
         }
-        queryCollector.cancel()
+        queryCollector.cancelAndJoin()
+        Assert.assertTrue(!queryCollector.isActive)
         contentResolver.insert(TABLE, values("key1", "val1"))
     }
 
     @Test
     fun testQueryNotNotifiedWhenQueryTransformerDisposed() = runBlockingTest {
-        contentResolver.observeQuery(TABLE).flowOn(dispatcher).test {
+        contentResolver.observeQuery(TABLE).takeWhile { !killSwitch.value }.test {
             awaitItemAndRunQuery().isExhausted()
             killSwitch.emit(true)
             contentResolver.insert(TABLE, values("key1", "val1"))
@@ -112,7 +123,7 @@ class KiteContentResolverTest {
 
         private val storage: MutableMap<String, String> = LinkedHashMap()
         
-        private val contentResolver: ContentResolver
+        val contentResolver: ContentResolver
             get() = context!!.contentResolver
 
         override fun onCreate(): Boolean = true
