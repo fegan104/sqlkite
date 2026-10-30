@@ -29,6 +29,7 @@ $dokka.location:com.frankegan.sqlkite/KiteDatabase/insert/#kotlin.String#kotlin.
 $dokka.location:com.frankegan.sqlkite/KiteDatabase/query/#androidx.sqlite.db.SupportSQLiteQuery/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/query.html
 $dokka.location:com.frankegan.sqlkite/KiteDatabase/query/#kotlin.String#kotlin.Array[kotlin.Any]/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/query.html
 $dokka.location:com.frankegan.sqlkite/KiteDatabase/readableDatabase/#/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/readable-database.html
+$dokka.location:com.frankegan.sqlkite/KiteDatabase/runInTransaction/#android.database.sqlite.SQLiteTransactionListener?#kotlin.Function0[TypeParam(bounds=[kotlin.Any?])]/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/run-in-transaction.html
 $dokka.location:com.frankegan.sqlkite/KiteDatabase/sendTableTrigger/#kotlin.String/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/send-table-trigger.html
 $dokka.location:com.frankegan.sqlkite/KiteDatabase/sendTableTrigger/#kotlin.collections.Set[kotlin.String]/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/send-table-trigger.html
 $dokka.location:com.frankegan.sqlkite/KiteDatabase/setLoggingEnabled/#kotlin.Boolean/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-kite-database/set-logging-enabled.html
@@ -47,6 +48,7 @@ $dokka.location:com.frankegan.sqlkite/SqlKite.Companion/DEFAULT_TRANSFORMER/#/Po
 $dokka.location:com.frankegan.sqlkite/SqlKite.Logger///PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/-logger/index.html
 $dokka.location:com.frankegan.sqlkite/SqlKite.Logger/log/#kotlin.String/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/-logger/log.html
 $dokka.location:com.frankegan.sqlkite/SqlKite.Query///PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/-query/index.html
+$dokka.location:com.frankegan.sqlkite/SqlKite.Query/dispatcher/#/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/-query/dispatcher.html
 $dokka.location:com.frankegan.sqlkite/SqlKite.Query/run/#/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/-query/run.html
 $dokka.location:com.frankegan.sqlkite/SqlKite///PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/index.html
 $dokka.location:com.frankegan.sqlkite/SqlKite/wrapDatabaseHelper/#androidx.sqlite.db.SupportSQLiteOpenHelper#kotlinx.coroutines.CoroutineDispatcher#java.util.concurrent.Executor?/PointingToDeclaration/sqlkite/com.frankegan.sqlkite/-sql-kite/wrap-database-helper.html
