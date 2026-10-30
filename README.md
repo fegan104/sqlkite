@@ -127,7 +127,7 @@ you use for Gson. It's not going to perform database migrations for you.
 
 Download
 --------
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.frankegan/sqlkite/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.frankegan/sqlkite)
+[![Sonatype Central](https://maven-badges.sml.io/sonatype-central/com.frankegan/sqlkite/badge.svg)](https://maven-badges.sml.io/sonatype-central/com.frankegan/sqlkite/)
 
 ```groovy
 //Project level build.gradle
