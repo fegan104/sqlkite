@@ -104,7 +104,7 @@ afterEvaluate {
         def secretKey = System.getenv("SIGNING_SECRET_KEY") ?: findProperty("signing.secretKey")
         def password = System.getenv("SIGNING_PASSWORD") ?: findProperty("signing.password")
 
-        if (secretKey) {
+        if (secretKey) { //Local builds use signing.secretKeyRingFile only CI uses signing.secretKey
             useInMemoryPgpKeys(keyId, secretKey, password)
         }
 
