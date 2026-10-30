@@ -30,6 +30,8 @@ android {
     defaultConfig {
         minSdkVersion versions.minSdk
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+
+//        buildConfigField "String", "VERSION_NAME", "\"${project.findProperty('VERSION_NAME')}\""
     }
 
     compileOptions {

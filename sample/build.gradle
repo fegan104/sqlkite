@@ -21,13 +21,13 @@ dependencies {
 }
 
 android {
+//    namespace 'com.example.sqlkite.todo'
     compileSdkVersion versions.compileSdk
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-
 
     defaultConfig {
         minSdkVersion versions.minSdk
@@ -37,6 +37,10 @@ android {
         versionCode 1
         versionName '1.0'
     }
+
+//    buildFeatures {
+//        buildConfig true
+//    }
 
     signingConfigs {
         debug {
@@ -53,4 +57,5 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+    namespace 'com.example.sqlkite.todo'
 }
