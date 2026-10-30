@@ -31,6 +31,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.filters.SdkSuppress
 import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import app.cash.turbine.test
+import com.frankegan.sqlkite.TestDb.EmployeeTable
 import com.google.common.truth.Truth
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -1259,14 +1260,13 @@ class KiteDatabaseTest {
                 launch(dispatcher1) {
                     db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
                 }
-                delay(100)
                 launch(dispatcher2) {
                     db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("nick", "Nick Nickers"))
                 }
             }
         }
 
-        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
+        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " ORDER BY ${EmployeeTable.USERNAME}").test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
                 .hasRow("bob", "Bob Bobberson")
