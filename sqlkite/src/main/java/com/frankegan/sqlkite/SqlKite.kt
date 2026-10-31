@@ -99,9 +99,9 @@ class SqlKite internal constructor(
         suspend fun run(): Cursor?
 
         /**
-        +         * Where [mapToOne], [mapToOneOrDefault], [mapToList] and [asRows] call [run] and read the
-        +         * cursor. `null` leaves that work on the collector's dispatcher.
-        +         */
+        * Where [mapToOne], [mapToOneOrDefault], [mapToList] and [asRows] call [run] and read the
+        * cursor. `null` leaves that work on the collector's dispatcher.
+        */
         val dispatcher: CoroutineDispatcher?
             get() = null
     }
