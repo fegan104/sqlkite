@@ -104,7 +104,7 @@ class KiteContentResolverTest {
     }
 
     @Test
-    fun testQueryNotNotifiedWhenQueryTransformerDisposed() = runBlockingTest {
+    fun testQueryNotNotifiedWhenQueryTransformerDisposed() = runBlocking {
         contentResolver.observeQuery(TABLE).takeWhile { !killSwitch.value }.test {
             awaitItemAndRunQuery().isExhausted()
             killSwitch.emit(true)

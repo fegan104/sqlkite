@@ -1,5 +1,0 @@
-include ':sqlkite'
-include ':sqlkite-lint'
-include ':sample'
-
-rootProject.name = 'sqlkite-root'
