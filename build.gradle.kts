@@ -1,8 +1,9 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.parcelize) version "2.3.10" apply false
     alias(libs.plugins.kotlin.jvm) apply false
-    alias(libs.plugins.google.ksp)
+    alias(libs.plugins.google.ksp) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.nexus.publish)
