@@ -1,7 +1,7 @@
 package com.frankegan.sqlkite
 
 import android.database.Cursor
-import app.cash.turbine.FlowTurbine
+import app.cash.turbine.TurbineTestContext
 import com.google.common.truth.Truth
 import java.lang.AssertionError
 import java.lang.StringBuilder
@@ -31,6 +31,6 @@ fun Cursor.isExhausted() {
     close()
 }
 
-suspend fun <Q: SqlKite.Query> FlowTurbine<Q>.awaitItemAndRunQuery(): Cursor {
+suspend fun <Q: SqlKite.Query> TurbineTestContext<Q>.awaitItemAndRunQuery(): Cursor {
     return awaitItem().run()!!
 }

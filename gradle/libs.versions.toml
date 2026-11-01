@@ -9,7 +9,7 @@ hilt = "2.60.1"
 dokka = "1.6.10"
 nexusPublish = "1.3.0"
 
-coroutines = "1.5.2"
+coroutines = "1.11.0"
 androidx-sqlite = "2.3.0"
 androidx-test = "1.5.0"
 androidx-fragment = "1.4.1"
@@ -17,7 +17,7 @@ androidx-lifecycle = "2.4.1"
 timber = "5.0.1"
 junit = "4.12"
 truth = "0.36"
-turbine = "0.7.0"
+turbine = "1.2.1"
 
 [libraries]
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
