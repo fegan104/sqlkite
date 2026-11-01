@@ -10,7 +10,7 @@ dokka = "1.6.10"
 nexusPublish = "1.3.0"
 
 coroutines = "1.5.2"
-androidx-sqlite = "2.2.0"
+androidx-sqlite = "2.3.0"
 androidx-test = "1.5.0"
 androidx-fragment = "1.4.1"
 androidx-lifecycle = "2.4.1"
