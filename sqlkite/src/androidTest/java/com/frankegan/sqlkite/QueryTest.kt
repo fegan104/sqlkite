@@ -25,6 +25,7 @@ import com.frankegan.sqlkite.TestDb.Employee
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -34,6 +35,7 @@ import java.util.concurrent.Executors
 class QueryTest {
 
     private lateinit var db: KiteDatabase
+    val dispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
@@ -43,13 +45,15 @@ class QueryTest {
         val factory: SupportSQLiteOpenHelper.Factory = FrameworkSQLiteOpenHelperFactory()
         val helper = factory.create(configuration)
         val sqlKite = SqlKite.Builder().build()
-        val dispatcher = StandardTestDispatcher()
         val executor = Executors.newSingleThreadExecutor()
         db = sqlKite.wrapDatabaseHelper(helper, dispatcher, executor)
     }
 
+    fun runBoundTest(testBody: suspend TestScope.() -> Unit) = runTest(dispatcher, testBody = testBody)
+
+
     @Test
-    fun mapToOne() = runTest {
+    fun mapToOne() = runBoundTest {
         val employees: Employee = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOne { Employee.MAPPER(it) }
             .first()
@@ -57,7 +61,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToOneThrowsOnMultipleRows() = runTest {
+    fun mapToOneThrowsOnMultipleRows() = runBoundTest {
         val employees: Flow<Employee> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 2") //
             .mapToOne { Employee.MAPPER(it) }
         try {
@@ -69,7 +73,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToOneOrDefault() = runTest {
+    fun mapToOneOrDefault() = runBoundTest {
         val employees: Employee = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOneOrDefault(Employee("fred", "Fred Frederson")) { Employee.MAPPER(it) }
             .first()
@@ -77,7 +81,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToOneOrDefaultThrowsOnMultipleRows() = runTest {
+    fun mapToOneOrDefaultThrowsOnMultipleRows() = runBoundTest {
         val employees: Flow<Employee> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 2") //
             .mapToOneOrDefault(Employee("fred", "Fred Frederson")) {
                 Employee.MAPPER(it)
@@ -91,7 +95,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToList() = runTest {
+    fun mapToList() = runBoundTest {
         val employees: List<Employee> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .mapToList(Employee.MAPPER)
             .first()
@@ -103,7 +107,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToListEmptyWhenNoRows() = runTest {
+    fun mapToListEmptyWhenNoRows() = runBoundTest {
         val employees: List<Employee?> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " WHERE 1=2")
             .mapToList(Employee.MAPPER)
             .first()
@@ -111,7 +115,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToListReturnsNullOnMapperNull() = runTest {
+    fun mapToListReturnsNullOnMapperNull() = runBoundTest {
         var count = 0
 
         val mapToNull = { cursor: Cursor ->
