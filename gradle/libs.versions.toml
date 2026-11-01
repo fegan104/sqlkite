@@ -46,13 +46,6 @@ lint-api = { group = "com.android.tools.lint", name = "lint-api", version.ref = 
 lint-impl = { group = "com.android.tools.lint", name = "lint", version.ref = "lint" }
 lint-tests = { group = "com.android.tools.lint", name = "lint-tests", version.ref = "lint" }
 
-# Plugins
-gradlePlugin-android = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
-gradlePlugin-kotlin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
-gradlePlugin-hilt = { group = "com.google.dagger", name = "hilt-android-gradle-plugin", version.ref = "hilt" }
-gradlePlugin-dokka = { group = "org.jetbrains.dokka", name = "dokka-gradle-plugin", version.ref = "dokka" }
-gradlePlugin-nexusPublish = { group = "io.github.gradle-nexus", name = "publish-plugin", version.ref = "nexusPublish" }
-
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 google-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
