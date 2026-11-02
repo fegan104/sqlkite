@@ -43,7 +43,6 @@ class QueryDispatcherTest {
     fun mapToOneReadsOnQueryDispatcher() = runTest {
         val thread = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOne { currentThreadName() }
-            .flowOn(queryDispatcher)
             .first()
         Truth.assertThat(thread).isEqualTo(QUERY_THREAD)
     }
@@ -52,7 +51,6 @@ class QueryDispatcherTest {
     fun mapToOneOrDefaultReadsOnQueryDispatcher() = runTest {
         val thread = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOneOrDefault("default") { currentThreadName() }
-            .flowOn(queryDispatcher)
             .first()
         Truth.assertThat(thread).isEqualTo(QUERY_THREAD)
     }
@@ -61,7 +59,6 @@ class QueryDispatcherTest {
     fun mapToListReadsOnQueryDispatcher() = runTest {
         val threads = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .mapToList { currentThreadName() }
-            .flowOn(queryDispatcher)
             .first()
         Truth.assertThat(threads).containsExactly(QUERY_THREAD, QUERY_THREAD, QUERY_THREAD)
     }
@@ -71,7 +68,6 @@ class QueryDispatcherTest {
         val threads = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .first()
             .asRows { currentThreadName() }
-            .flowOn(queryDispatcher)
             .toList()
         Truth.assertThat(threads).containsExactly(QUERY_THREAD, QUERY_THREAD, QUERY_THREAD)
     }

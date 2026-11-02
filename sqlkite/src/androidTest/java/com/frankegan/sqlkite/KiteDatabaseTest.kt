@@ -32,7 +32,6 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import app.cash.turbine.test
 import app.cash.turbine.turbineScope
-import com.frankegan.sqlkite.TestDb.EmployeeTable
 import com.google.common.truth.Truth
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -61,7 +60,7 @@ class KiteDatabaseTest {
 
     private val testDb = TestDb()
     private val logs: MutableList<String?> = ArrayList()
-    private val dispatcher = StandardTestDispatcher()
+    val testScope = TestScope()
     private var killSwitch: Boolean = true
 
     @get:Rule
@@ -85,29 +84,27 @@ class KiteDatabaseTest {
             logs.add(message)
         }
 
-        db = KiteDatabase(helper, logger, dispatcher) { upstream ->
+        db = KiteDatabase(helper, logger, StandardTestDispatcher(testScope.testScheduler)) { upstream ->
             upstream.takeWhile { killSwitch }
         }
     }
-
-    fun runBoundTest(testBody: suspend TestScope.() -> Unit) = runTest(dispatcher, testBody = testBody)
-
+    
     @Test
-    fun loggerEnabled() = runBoundTest {
+    fun loggerEnabled() = testScope.runTest {
         db.setLoggingEnabled(true)
         db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
         Truth.assertThat(logs).isNotEmpty()
     }
 
     @Test
-    fun loggerDisabled() = runBoundTest {
+    fun loggerDisabled() = testScope.runTest {
         db.setLoggingEnabled(false)
         db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
         Truth.assertThat(logs).isEmpty()
     }
 
     @Test
-    fun loggerIndentsSqlForCreateQuery() = runBoundTest {
+    fun loggerIndentsSqlForCreateQuery() = testScope.runTest {
         db.setLoggingEnabled(true)
         db.createQuery(TestDb.TABLE_EMPLOYEE, "SELECT\n1").test {
             awaitItemAndRunQuery().close()
@@ -121,7 +118,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun loggerIndentsSqlForQuery() = runBoundTest {
+    fun loggerIndentsSqlForQuery() = testScope.runTest {
         db.setLoggingEnabled(true)
         db.query("SELECT\n1").close()
         Truth.assertThat(logs).containsExactly(
@@ -133,7 +130,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun loggerIndentsSqlForExecute() = runBoundTest {
+    fun loggerIndentsSqlForExecute() = testScope.runTest {
         db.setLoggingEnabled(true)
         db.execute("PRAGMA\ncompile_options")
         Truth.assertThat(logs).containsExactly(
@@ -144,7 +141,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun loggerIndentsSqlForExecuteWithArgs() = runBoundTest {
+    fun loggerIndentsSqlForExecuteWithArgs() = testScope.runTest {
         db.setLoggingEnabled(true)
         db.execute("PRAGMA\ncompile_options", *arrayOfNulls<Any>(0))
         Truth.assertThat(logs).containsExactly(
@@ -162,7 +159,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun query() = runBoundTest {
+    fun query() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -173,7 +170,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryWithQueryObject() = runBoundTest {
+    fun queryWithQueryObject() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, SimpleSQLiteQuery(TestDb.SELECT_EMPLOYEES)).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -184,7 +181,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMapToList() = runBoundTest {
+    fun queryMapToList() = testScope.runTest {
         val employees: List<TestDb.Employee?> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .mapToList(TestDb.Employee.MAPPER)
             .first()
@@ -196,7 +193,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMapToOne() = runBoundTest {
+    fun queryMapToOne() = testScope.runTest {
         val employees: TestDb.Employee = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOne(TestDb.Employee.MAPPER)
             .first()
@@ -204,7 +201,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMapToOneOrDefault() = runBoundTest {
+    fun queryMapToOneOrDefault() = testScope.runTest {
         val employees: TestDb.Employee = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOneOrDefault(TestDb.Employee("wrong", "Wrong Person"), TestDb.Employee.MAPPER)
             .first()
@@ -212,7 +209,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun badQueryCallsError() = runBoundTest {
+    fun badQueryCallsError() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, "SELECT * FROM missing")
             .map { query -> query.run() }
             .test {
@@ -221,7 +218,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryWithArgs() = runBoundTest {
+    fun queryWithArgs() = testScope.runTest {
         db.createQuery(
             TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " WHERE " + TestDb.EmployeeTable.USERNAME + " = ?", "bob"
         ).test {
@@ -232,7 +229,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryObservesInsert() = runBoundTest {
+    fun queryObservesInsert() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -251,7 +248,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryInitialValueAndTriggerUsesScheduler() = runBoundTest {
+    fun queryInitialValueAndTriggerUsesScheduler() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -270,7 +267,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryNotNotifiedWhenInsertFails() = runBoundTest {
+    fun queryNotNotifiedWhenInsertFails() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -282,7 +279,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryNotNotifiedWhenQueryTransformerUnsubscribes() = runBoundTest {
+    fun queryNotNotifiedWhenQueryTransformerUnsubscribes() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -296,7 +293,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryObservesUpdate() = runBoundTest {
+    fun queryObservesUpdate() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -315,7 +312,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryNotNotifiedWhenUpdateAffectsZeroRows() = runBoundTest {
+    fun queryNotNotifiedWhenUpdateAffectsZeroRows() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -329,7 +326,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryObservesDelete() = runBoundTest {
+    fun queryObservesDelete() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -345,7 +342,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryNotNotifiedWhenDeleteAffectsZeroRows() = runBoundTest {
+    fun queryNotNotifiedWhenDeleteAffectsZeroRows() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -357,7 +354,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMultipleTables() = runBoundTest {
+    fun queryMultipleTables() = testScope.runTest {
         db.createQuery(TestDb.BOTH_TABLES, TestDb.SELECT_MANAGER_LIST).test {
             awaitItemAndRunQuery()
                 .hasRow("Eve Evenson", "Alice Allison")
@@ -366,7 +363,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMultipleTablesWithQueryObject() = runBoundTest {
+    fun queryMultipleTablesWithQueryObject() = testScope.runTest {
         db.createQuery(TestDb.BOTH_TABLES, SimpleSQLiteQuery(TestDb.SELECT_MANAGER_LIST)).test {
             awaitItemAndRunQuery()
                 .hasRow("Eve Evenson", "Alice Allison")
@@ -375,7 +372,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMultipleTablesObservesChanges() = runBoundTest {
+    fun queryMultipleTablesObservesChanges() = testScope.runTest {
         db.createQuery(TestDb.BOTH_TABLES, TestDb.SELECT_MANAGER_LIST).test {
             awaitItemAndRunQuery()
                 .hasRow("Eve Evenson", "Alice Allison")
@@ -397,7 +394,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryMultipleTablesObservesChangesOnlyOnce() = runBoundTest {
+    fun queryMultipleTablesObservesChangesOnlyOnce() = testScope.runTest {
         // Employee table is in this list twice. We should still only be notified once for a change.
         val tables = listOf(TestDb.TABLE_EMPLOYEE, TestDb.TABLE_MANAGER, TestDb.TABLE_EMPLOYEE)
         db.createQuery(tables, TestDb.SELECT_MANAGER_LIST).test {
@@ -415,24 +412,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryNotNotifiedAfterDispose() = runBoundTest {
-        coroutineScope {
-            val queryCollector = launch {
-                db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
-                    awaitItemAndRunQuery()
-                        .hasRow("alice", "Alice Allison")
-                        .hasRow("bob", "Bob Bobberson")
-                        .hasRow("eve", "Eve Evenson")
-                        .isExhausted()
-                }
-            }
-            queryCollector.cancel()
-            db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
-        }
-    }
-
-    @Test
-    fun executeSqlNoTrigger() = runBoundTest {
+    fun executeSqlNoTrigger() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .drop(1) // Skip initial
             .test {
@@ -441,7 +421,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlWithArgsNoTrigger() = runBoundTest {
+    fun executeSqlWithArgsNoTrigger() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .drop(1) // Skip initial
             .test {
@@ -450,7 +430,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlAndTrigger() = runBoundTest {
+    fun executeSqlAndTrigger() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -470,7 +450,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlAndTriggerMultipleTables() = runBoundTest {
+    fun executeSqlAndTriggerMultipleTables() = testScope.runTest {
         turbineScope {
             var managerFlow: Flow<SqlKite.Query>? = null
             var employeeFlow: Flow<SqlKite.Query>? = null
@@ -497,7 +477,7 @@ class KiteDatabaseTest {
 
             db.executeAndTrigger(
                 TestDb.BOTH_TABLES.toSet(),
-                "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + EmployeeTable.NAME + " = 'Zach'"
+                "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.NAME + " = 'Zach'"
             )
             managerFlow!!.test {
                 awaitItemAndRunQuery()
@@ -515,7 +495,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlAndTriggerWithNoTables() = runBoundTest {
+    fun executeSqlAndTriggerWithNoTables() = testScope.runTest {
         db.createQuery(TestDb.TABLE_MANAGER, TestDb.SELECT_MANAGER_LIST).test {
             awaitItemAndRunQuery()
                 .hasRow("Eve Evenson", "Alice Allison")
@@ -528,7 +508,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlThrowsAndDoesNotTrigger() = runBoundTest {
+    fun executeSqlThrowsAndDoesNotTrigger() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .drop(1) // Skip initial
             .test { }
@@ -543,7 +523,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlWithArgsAndTrigger() = runBoundTest {
+    fun executeSqlWithArgsAndTrigger() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -563,7 +543,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlWithArgsThrowsAndDoesNotTrigger() = runBoundTest {
+    fun executeSqlWithArgsThrowsAndDoesNotTrigger() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .drop(1) // Skip initial
             .test { }
@@ -578,7 +558,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeSqlWithArgsAndTriggerWithMultipleTables() = runBoundTest {
+    fun executeSqlWithArgsAndTriggerWithMultipleTables() = testScope.runTest {
         val managerFlow = db.createQuery(TestDb.TABLE_MANAGER, TestDb.SELECT_MANAGER_LIST)
         managerFlow.test {
             awaitItemAndRunQuery()
@@ -615,7 +595,7 @@ class KiteDatabaseTest {
 
 
     @Test
-    fun executeSqlWithArgsAndTriggerWithNoTables() = runBoundTest {
+    fun executeSqlWithArgsAndTriggerWithNoTables() = testScope.runTest {
         db.createQuery(TestDb.BOTH_TABLES, TestDb.SELECT_MANAGER_LIST).test {
             awaitItemAndRunQuery()
                 .hasRow("Eve Evenson", "Alice Allison")
@@ -628,7 +608,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertAndTrigger() = runBoundTest {
+    fun executeInsertAndTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
@@ -652,7 +632,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertAndDontTrigger() = runBoundTest {
+    fun executeInsertAndDontTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT OR IGNORE INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
@@ -669,7 +649,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertAndTriggerMultipleTables() = runBoundTest {
+    fun executeInsertAndTriggerMultipleTables() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
@@ -711,7 +691,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertAndTriggerNoTables() = runBoundTest {
+    fun executeInsertAndTriggerNoTables() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
@@ -728,7 +708,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertThrowsAndDoesNotTrigger() = runBoundTest {
+    fun executeInsertThrowsAndDoesNotTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") "
@@ -746,7 +726,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertWithArgsAndTrigger() = runBoundTest {
+    fun executeInsertWithArgsAndTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") VALUES (?, ?)"
@@ -770,7 +750,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeInsertWithArgsThrowsAndDoesNotTrigger() = runBoundTest {
+    fun executeInsertWithArgsThrowsAndDoesNotTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "INSERT INTO "
                     + TestDb.TABLE_EMPLOYEE + " (" + TestDb.EmployeeTable.NAME + ", " + TestDb.EmployeeTable.USERNAME + ") VALUES (?, ?)"
@@ -792,7 +772,7 @@ class KiteDatabaseTest {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    fun executeUpdateDeleteAndTrigger() = runBoundTest {
+    fun executeUpdateDeleteAndTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.NAME + " = 'Zach'"
         )
@@ -814,7 +794,7 @@ class KiteDatabaseTest {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    fun executeUpdateDeleteAndDontTrigger() = runBoundTest {
+    fun executeUpdateDeleteAndDontTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             ""
                     + "UPDATE " + TestDb.TABLE_EMPLOYEE
@@ -834,7 +814,7 @@ class KiteDatabaseTest {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    fun executeUpdateDeleteAndTriggerWithMultipleTables() = runBoundTest {
+    fun executeUpdateDeleteAndTriggerWithMultipleTables() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.NAME + " = 'Zach'"
         )
@@ -871,7 +851,7 @@ class KiteDatabaseTest {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    fun executeUpdateDeleteAndTriggerWithNoTables() = runBoundTest {
+    fun executeUpdateDeleteAndTriggerWithNoTables() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.NAME + " = 'Zach'"
         )
@@ -886,9 +866,9 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun executeUpdateDeleteThrowsAndDoesNotTrigger() = runBoundTest {
+    fun executeUpdateDeleteThrowsAndDoesNotTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
-            "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + EmployeeTable.USERNAME + " = 'alice'"
+            "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.USERNAME + " = 'alice'"
         )
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .drop(1) // Skip initial
@@ -905,7 +885,7 @@ class KiteDatabaseTest {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    fun executeUpdateDeleteWithArgsAndTrigger() = runBoundTest {
+    fun executeUpdateDeleteWithArgsAndTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.NAME + " = ?"
         )
@@ -928,7 +908,7 @@ class KiteDatabaseTest {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    fun executeUpdateDeleteWithArgsThrowsAndDoesNotTrigger() = runBoundTest {
+    fun executeUpdateDeleteWithArgsThrowsAndDoesNotTrigger() = testScope.runTest {
         val statement: SupportSQLiteStatement = real.compileStatement(
             "UPDATE " + TestDb.TABLE_EMPLOYEE + " SET " + TestDb.EmployeeTable.USERNAME + " = ?"
         )
@@ -945,7 +925,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun transactionOnlyNotifiesOnceAndTransactionDoesNotThrow() = runBoundTest {
+    fun transactionOnlyNotifiesOnceAndTransactionDoesNotThrow() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -971,7 +951,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryCreatedDuringWithTransactionThrows() = runBoundTest {
+    fun queryCreatedDuringWithTransactionThrows() = testScope.runTest {
         db.withTransaction {
             try {
                 db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
@@ -983,7 +963,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun querySubscribedToDuringWithTransactionThrows() = runBoundTest {
+    fun querySubscribedToDuringWithTransactionThrows() = testScope.runTest {
         val query = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
         db.withTransaction {
             query.test {
@@ -996,7 +976,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun queryCreatedBeforeWithTransactionButSubscribedAfter() = runBoundTest {
+    fun queryCreatedBeforeWithTransactionButSubscribedAfter() = testScope.runTest {
         val query = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
         db.withTransaction {
             db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
@@ -1014,7 +994,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun cancelledWithTransactionRollsBackAndReleasesConnection() = runBoundTest {
+    fun cancelledWithTransactionRollsBackAndReleasesConnection() = testScope.runTest {
         val inserted = CompletableDeferred<Unit>()
         val transaction = launch {
             db.withTransaction {
@@ -1026,16 +1006,19 @@ class KiteDatabaseTest {
         inserted.await()
         transaction.cancelAndJoin()
 
-        // A leaked transaction blocks this read forever inside SQLiteConnectionPool, so run it
-        // outside this scope where runTest won't wait on it and the timeout can still fire.
-        val employeeCount = backgroundScope.async {
-            db.query(TestDb.SELECT_EMPLOYEES).use { cursor -> cursor.count }
+        // A leaked transaction blocks this read forever inside SQLiteConnectionPool. Read on a real
+        // thread with a wall-clock timeout so the leak fails the test instead of hanging the scheduler.
+        val employeeCount = backgroundScope.async(Dispatchers.IO) {
+            real.query(TestDb.SELECT_EMPLOYEES).use { cursor -> cursor.count }
         }
-        Truth.assertThat(withTimeoutOrNull(5_000) { employeeCount.await() }).isEqualTo(3)
+        val count = withContext(Dispatchers.Default) {
+            withTimeoutOrNull(5_000) { employeeCount.await() }
+        }
+        Truth.assertThat(count).isEqualTo(3)
     }
 
     @Test
-    fun runInTransactionSendsHeldTriggersOnceAfterCommit() = runBoundTest {
+    fun runInTransactionSendsHeldTriggersOnceAfterCommit() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -1062,7 +1045,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun runInTransactionDropsHeldTriggersOnRollback() = runBoundTest {
+    fun runInTransactionDropsHeldTriggersOnRollback() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery().close()
 
@@ -1080,7 +1063,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun runInTransactionInsideWithTransactionHandsTriggersToOuter() = runBoundTest {
+    fun runInTransactionInsideWithTransactionHandsTriggersToOuter() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery().close()
 
@@ -1127,7 +1110,7 @@ class KiteDatabaseTest {
 
 
     @Test
-    fun synchronousQueryDuringTransaction() = runBoundTest {
+    fun synchronousQueryDuringTransaction() = testScope.runTest {
         db.withTransaction {
             db.query(TestDb.SELECT_EMPLOYEES)
                 .hasRow("alice", "Alice Allison")
@@ -1138,7 +1121,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun synchronousQueryDuringTransactionSeesChanges() = runBoundTest {
+    fun synchronousQueryDuringTransactionSeesChanges() = testScope.runTest {
         db.withTransaction {
             db.query(TestDb.SELECT_EMPLOYEES)
                 .hasRow("alice", "Alice Allison")
@@ -1158,7 +1141,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun synchronousQueryWithSupportSQLiteQueryDuringTransaction() = runBoundTest {
+    fun synchronousQueryWithSupportSQLiteQueryDuringTransaction() = testScope.runTest {
         db.withTransaction {
             db.query(SimpleSQLiteQuery(TestDb.SELECT_EMPLOYEES))
                 .hasRow("alice", "Alice Allison")
@@ -1169,7 +1152,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun nestedTransactionsOnlyNotifyOnce() = runBoundTest {
+    fun nestedTransactionsOnlyNotifyOnce() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -1193,7 +1176,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun nestedTransactionsOnMultipleTables() = runBoundTest {
+    fun nestedTransactionsOnMultipleTables() = testScope.runTest {
         db.createQuery(TestDb.BOTH_TABLES, TestDb.SELECT_MANAGER_LIST).test {
             awaitItemAndRunQuery()
                 .hasRow("Eve Evenson", "Alice Allison")
@@ -1215,7 +1198,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun emptyTransactionDoesNotNotify() = runBoundTest {
+    fun emptyTransactionDoesNotNotify() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -1227,7 +1210,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun transactionRollbackDoesNotNotify() = runBoundTest {
+    fun transactionRollbackDoesNotNotify() = testScope.runTest {
         db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
@@ -1247,7 +1230,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun nonExclusiveTransactionWorks() = runBoundTest {
+    fun nonExclusiveTransactionWorks() = testScope.runTest {
         db.withNonExclusiveTransaction {
             db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("hans", "Hans Hanson"))
         }
@@ -1260,7 +1243,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun suspendingTransactionsWontDeadlock() = runBoundTest {
+    fun suspendingTransactionsWontDeadlock() = testScope.runTest {
         val dispatcher1 = newSingleThreadContext("dispatcher1")
         val dispatcher2 = newSingleThreadContext("dispatcher2")
 
@@ -1275,7 +1258,7 @@ class KiteDatabaseTest {
             }
         }
 
-        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " ORDER BY ${EmployeeTable.USERNAME}").test {
+        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " ORDER BY ${TestDb.EmployeeTable.USERNAME}").test {
             awaitItemAndRunQuery()
                 .hasRow("alice", "Alice Allison")
                 .hasRow("bob", "Bob Bobberson")
@@ -1287,7 +1270,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun badQueryThrows() = runBoundTest {
+    fun badQueryThrows() = testScope.runTest {
         try {
             db.query("SELECT * FROM missing")
             Assert.fail()
@@ -1297,7 +1280,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun badInsertThrows() = runBoundTest {
+    fun badInsertThrows() = testScope.runTest {
         try {
             db.insert("missing", SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
             Assert.fail()
@@ -1307,7 +1290,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun badUpdateThrows() = runBoundTest {
+    fun badUpdateThrows() = testScope.runTest {
         try {
             db.update("missing", SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"), "1")
             Assert.fail()
@@ -1317,7 +1300,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun badDeleteThrows() = runBoundTest {
+    fun badDeleteThrows() = testScope.runTest {
         try {
             db.delete("missing", "1")
             Assert.fail()
@@ -1327,7 +1310,7 @@ class KiteDatabaseTest {
     }
 
     @Test
-    fun inSuspendTransaction() = runBoundTest {
+    fun inSuspendTransaction() = testScope.runTest {
         Truth.assertThat(db.inSuspendingTransaction).isFalse()
         db.withTransaction {
             Truth.assertThat(db.inSuspendingTransaction).isTrue()

@@ -56,8 +56,7 @@ class KiteContentResolverTest {
     fun testCreateQueryObservesInsert() = runTest {
         contentResolver.observeQuery(TABLE).test {
             awaitItemAndRunQuery().isExhausted()
-            val insertedUri = contentResolver.insert(TABLE, values("key1", "val1"))
-            contentResolver.notifyChange(insertedUri!!, null)
+            contentResolver.insert(TABLE, values("key1", "val1"))
             awaitItemAndRunQuery()
                 .hasRow("key1", "val1")
                 .isExhausted()
@@ -91,7 +90,8 @@ class KiteContentResolverTest {
                 awaitItemAndRunQuery().isExhausted()
             }
         }
-        queryCollector.cancelAndJoin()
+        queryCollector.join()
+        queryCollector.cancel()
         Assert.assertTrue(!queryCollector.isActive)
         contentResolver.insert(TABLE, values("key1", "val1"))
     }

@@ -35,7 +35,7 @@ import java.util.concurrent.Executors
 class QueryTest {
 
     private lateinit var db: KiteDatabase
-    val dispatcher = StandardTestDispatcher()
+    private val testScope = TestScope()
 
     @Before
     fun setUp() {
@@ -46,14 +46,11 @@ class QueryTest {
         val helper = factory.create(configuration)
         val sqlKite = SqlKite.Builder().build()
         val executor = Executors.newSingleThreadExecutor()
-        db = sqlKite.wrapDatabaseHelper(helper, dispatcher, executor)
+        db = sqlKite.wrapDatabaseHelper(helper, StandardTestDispatcher(testScope.testScheduler), executor)
     }
 
-    fun runBoundTest(testBody: suspend TestScope.() -> Unit) = runTest(dispatcher, testBody = testBody)
-
-
     @Test
-    fun mapToOne() = runBoundTest {
+    fun mapToOne() = testScope.runTest {
         val employees: Employee = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOne { Employee.MAPPER(it) }
             .first()
@@ -61,7 +58,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToOneThrowsOnMultipleRows() = runBoundTest {
+    fun mapToOneThrowsOnMultipleRows() = testScope.runTest {
         val employees: Flow<Employee> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 2") //
             .mapToOne { Employee.MAPPER(it) }
         try {
@@ -73,7 +70,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToOneOrDefault() = runBoundTest {
+    fun mapToOneOrDefault() = testScope.runTest {
         val employees: Employee = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOneOrDefault(Employee("fred", "Fred Frederson")) { Employee.MAPPER(it) }
             .first()
@@ -81,7 +78,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToOneOrDefaultThrowsOnMultipleRows() = runBoundTest {
+    fun mapToOneOrDefaultThrowsOnMultipleRows() = testScope.runTest {
         val employees: Flow<Employee> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 2") //
             .mapToOneOrDefault(Employee("fred", "Fred Frederson")) {
                 Employee.MAPPER(it)
@@ -95,7 +92,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToList() = runBoundTest {
+    fun mapToList() = testScope.runTest {
         val employees: List<Employee> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .mapToList(Employee.MAPPER)
             .first()
@@ -107,7 +104,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToListEmptyWhenNoRows() = runBoundTest {
+    fun mapToListEmptyWhenNoRows() = testScope.runTest {
         val employees: List<Employee?> = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " WHERE 1=2")
             .mapToList(Employee.MAPPER)
             .first()
@@ -115,7 +112,7 @@ class QueryTest {
     }
 
     @Test
-    fun mapToListReturnsNullOnMapperNull() = runBoundTest {
+    fun mapToListReturnsNullOnMapperNull() = testScope.runTest {
         var count = 0
 
         val mapToNull = { cursor: Cursor ->
