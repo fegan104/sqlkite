@@ -7,8 +7,10 @@ import com.google.common.truth.Truth
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
@@ -38,34 +40,38 @@ class QueryDispatcherTest {
     }
 
     @Test
-    fun mapToOneReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun mapToOneReadsOnQueryDispatcher() = runTest {
         val thread = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOne { currentThreadName() }
+            .flowOn(queryDispatcher)
             .first()
         Truth.assertThat(thread).isEqualTo(QUERY_THREAD)
     }
 
     @Test
-    fun mapToOneOrDefaultReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun mapToOneOrDefaultReadsOnQueryDispatcher() = runTest {
         val thread = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOneOrDefault("default") { currentThreadName() }
+            .flowOn(queryDispatcher)
             .first()
         Truth.assertThat(thread).isEqualTo(QUERY_THREAD)
     }
 
     @Test
-    fun mapToListReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun mapToListReadsOnQueryDispatcher() = runTest {
         val threads = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .mapToList { currentThreadName() }
+            .flowOn(queryDispatcher)
             .first()
         Truth.assertThat(threads).containsExactly(QUERY_THREAD, QUERY_THREAD, QUERY_THREAD)
     }
 
     @Test
-    fun asRowsReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun asRowsReadsOnQueryDispatcher() = runTest {
         val threads = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .first()
             .asRows { currentThreadName() }
+            .flowOn(queryDispatcher)
             .toList()
         Truth.assertThat(threads).containsExactly(QUERY_THREAD, QUERY_THREAD, QUERY_THREAD)
     }
