@@ -623,7 +623,7 @@ class KiteDatabase internal constructor(
     }
 
     private suspend fun <R> withTransaction(
-        beginStatement: SupportSQLiteDatabase.(SQLiteTransactionListener?) -> Unit,
+        beginStatement: SupportSQLiteDatabase.(SQLiteTransactionListener) -> Unit,
         block: suspend () -> R
     ): R {
         // Use inherited transaction context if available, this allows nested suspending transactions.

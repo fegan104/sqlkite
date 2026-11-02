@@ -6,7 +6,7 @@ import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import com.google.common.truth.Truth
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.runBlockingTest
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicInteger
@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class SqlKiteTest {
 
     @Test
-    fun asRowsEmpty() = runBlockingTest {
+    fun asRowsEmpty() = runTest {
         val cursor = MatrixCursor(COLUMN_NAMES)
         val query: SqlKite.Query = CursorQuery(cursor)
         val names: List<Name?> = query.asRows(Name.MAP).toList()
@@ -23,7 +23,7 @@ class SqlKiteTest {
     }
 
     @Test
-    fun asRows() = runBlockingTest {
+    fun asRows() = runTest {
         val cursor = MatrixCursor(COLUMN_NAMES)
         cursor.addRow(arrayOf<Any>("Alice", "Allison"))
         cursor.addRow(arrayOf<Any>("Bob", "Bobberson"))
@@ -33,7 +33,7 @@ class SqlKiteTest {
     }
 
     @Test
-    fun asRowsStopsWhenUnsubscribed() = runBlockingTest {
+    fun asRowsStopsWhenUnsubscribed() = runTest {
         val cursor = MatrixCursor(COLUMN_NAMES)
         cursor.addRow(arrayOf<Any>("Alice", "Allison"))
         cursor.addRow(arrayOf<Any>("Bob", "Bobberson"))

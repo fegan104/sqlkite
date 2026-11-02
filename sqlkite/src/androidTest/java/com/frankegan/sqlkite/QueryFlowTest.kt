@@ -20,13 +20,13 @@ import android.database.MatrixCursor
 import app.cash.turbine.test
 import com.google.common.truth.Truth
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.runBlockingTest
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class QueryFlowTest {
 
     @Test
-    fun mapToListThrowsFromQueryRun() = runBlockingTest {
+    fun mapToListThrowsFromQueryRun() = runTest {
         val error = IllegalStateException("test exception")
 
         val query: SqlKite.Query = SqlKite.Query { throw error }
@@ -38,7 +38,7 @@ class QueryFlowTest {
     }
 
     @Test
-    fun mapToListThrowsFromMapFunction() = runBlockingTest {
+    fun mapToListThrowsFromMapFunction() = runTest {
         val query: SqlKite.Query = SqlKite.Query {
             val cursor = MatrixCursor(arrayOf("col1"))
             cursor.addRow(arrayOf("value1"))
