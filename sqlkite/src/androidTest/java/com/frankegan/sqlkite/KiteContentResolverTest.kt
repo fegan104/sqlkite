@@ -26,10 +26,9 @@ import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -54,7 +53,7 @@ class KiteContentResolverTest {
     }
 
     @Test
-    fun testCreateQueryObservesInsert() = runBlocking {
+    fun testCreateQueryObservesInsert() = runTest {
         contentResolver.observeQuery(TABLE).test {
             awaitItemAndRunQuery().isExhausted()
             val insertedUri = contentResolver.insert(TABLE, values("key1", "val1"))
@@ -66,7 +65,7 @@ class KiteContentResolverTest {
     }
 
     @Test
-    fun testCreateQueryObservesUpdate() = runBlocking {
+    fun testCreateQueryObservesUpdate() = runTest {
         contentResolver.insert(TABLE, values("key1", "val1"))
         contentResolver.observeQuery(TABLE).test {
             awaitItemAndRunQuery().hasRow("key1", "val1").isExhausted()
@@ -76,7 +75,7 @@ class KiteContentResolverTest {
     }
 
     @Test
-    fun testCreateQueryObservesDelete() = runBlocking {
+    fun testCreateQueryObservesDelete() = runTest {
         contentResolver.insert(TABLE, values("key1", "val1"))
         contentResolver.observeQuery(TABLE).test {
             awaitItemAndRunQuery().hasRow("key1", "val1").isExhausted()
@@ -86,7 +85,7 @@ class KiteContentResolverTest {
     }
 
     @Test
-    fun testUnsubscribeDoesNotTrigger() = runBlocking<Unit> {
+    fun testUnsubscribeDoesNotTrigger() = runTest {
         val queryCollector = launch {
             contentResolver.observeQuery(TABLE).test {
                 awaitItemAndRunQuery().isExhausted()
@@ -98,7 +97,7 @@ class KiteContentResolverTest {
     }
 
     @Test
-    fun testQueryNotNotifiedWhenQueryTransformerDisposed() = runBlocking {
+    fun testQueryNotNotifiedWhenQueryTransformerDisposed() = runTest {
         contentResolver.observeQuery(TABLE).takeWhile { !killSwitch.value }.test {
             awaitItemAndRunQuery().isExhausted()
             killSwitch.emit(true)
