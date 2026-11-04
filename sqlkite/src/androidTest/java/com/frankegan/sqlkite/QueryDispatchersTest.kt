@@ -7,8 +7,10 @@ import com.google.common.truth.Truth
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
@@ -38,7 +40,7 @@ class QueryDispatcherTest {
     }
 
     @Test
-    fun mapToOneReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun mapToOneReadsOnQueryDispatcher() = runTest {
         val thread = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOne { currentThreadName() }
             .first()
@@ -46,7 +48,7 @@ class QueryDispatcherTest {
     }
 
     @Test
-    fun mapToOneOrDefaultReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun mapToOneOrDefaultReadsOnQueryDispatcher() = runTest {
         val thread = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES + " LIMIT 1")
             .mapToOneOrDefault("default") { currentThreadName() }
             .first()
@@ -54,7 +56,7 @@ class QueryDispatcherTest {
     }
 
     @Test
-    fun mapToListReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun mapToListReadsOnQueryDispatcher() = runTest {
         val threads = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .mapToList { currentThreadName() }
             .first()
@@ -62,7 +64,7 @@ class QueryDispatcherTest {
     }
 
     @Test
-    fun asRowsReadsOnQueryDispatcher() = runBlocking<Unit> {
+    fun asRowsReadsOnQueryDispatcher() = runTest {
         val threads = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
             .first()
             .asRows { currentThreadName() }
