@@ -26,6 +26,7 @@ import androidx.sqlite.db.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asContextElement
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -49,7 +50,10 @@ class KiteDatabase internal constructor(
 
     private val suspendingTransactions = ThreadLocal<SqliteTransaction?>()
 
-    private val triggers = MutableSharedFlow<Set<String>>(extraBufferCapacity = 1)
+    /**
+     * A flow mapping table names to the number of times each table has been triggered.
+     * */
+    private val triggers = MutableStateFlow<Map<String, Long>>(emptyMap())
 
     /**
      * True if the underlying database is in a transaction or if we are still in a transaction
@@ -74,21 +78,21 @@ class KiteDatabase internal constructor(
 
     /**
      * Create and/or open a database.  This will be the same object returned by
-     * [SupportSQLiteOpenHelper.getWritableDatabase] unless some problem, such as a full disk,
+     * [SupportSQLiteOpenHelper.writableDatabase] unless some problem, such as a full disk,
      * requires the database to be opened read-only.  In that case, a read-only
      * database object will be returned.  If the problem is fixed, a future call
-     * to [SupportSQLiteOpenHelper.getWritableDatabase] may succeed, in which case the read-only
+     * to [SupportSQLiteOpenHelper.writableDatabase] may succeed, in which case the read-only
      * database object will be closed and the read/write object will be returned
      * in the future.
      *
      *
-     * Like [SupportSQLiteOpenHelper.getWritableDatabase], this method may
+     * Like [SupportSQLiteOpenHelper.writableDatabase], this method may
      * take a long time to return, so you should not call it from the
      * application main thread, including from
-     * [ContentProvider.onCreate()][android.content.ContentProvider.onCreate].
+     * [android.content.ContentProvider.onCreate].
      *
      * @throws android.database.sqlite.SQLiteException if the database cannot be opened
-     * @return a database object valid until [SupportSQLiteOpenHelper.getWritableDatabase]
+     * @return a database object valid until [SupportSQLiteOpenHelper.writableDatabase]
      * or [.close] is called.
      */
     @get:WorkerThread
@@ -143,7 +147,9 @@ class KiteDatabase internal constructor(
 
     private fun emitTableTrigger(tables: Set<String>) {
         if (logging) log("TRIGGER %s", tables)
-        triggers.tryEmit(tables)
+        triggers.update { versions ->
+           versions + tables.associateWith { table -> (versions[table] ?: 0L) + 1 }
+        }
     }
 
     /**
@@ -261,11 +267,12 @@ class KiteDatabase internal constructor(
             Use query() for a query inside a transaction.
             """.trimIndent()
         }
+        // The current versions are the first emission, so a write just before collecting is already in them.
         return triggers
             .onSubscription { ensureNotInTransaction() }
-            .filter { query.selectsFor(it) } // DatabaseQuery filters triggers to on tables we care about.
+            .map { versions -> query.versionsFor(versions) }
+            .distinctUntilChanged() // Only a change to one of this query's tables re-runs it.
             .map { query } // DatabaseQuery maps to itself to save an allocation.
-            .onStart { emit(query) }
             .flowOn(queryDispatcher)
             .let(queryTransformer) // Apply the user's query transformer.
     }
@@ -275,10 +282,8 @@ class KiteDatabase internal constructor(
      * special single threaded transaction dispatcher if we are in a transaction.
      */
     private suspend fun <R> withQueryOrTransactionContext(block: suspend () -> R): R {
-        // Use the transaction dispatcher if we are on a transaction coroutine, otherwise
-        // use the database dispatchers.
-        val context = coroutineContext[TransactionElement]?.transactionDispatcher
-            ?: queryDispatcher
+        // Use the transaction dispatcher if we are on a transaction coroutine, otherwise use the database dispatchers.
+        val context = currentCoroutineContext()[TransactionElement]?.transactionDispatcher ?: queryDispatcher
         return withContext(context) {
             block()
         }
@@ -734,14 +739,7 @@ class KiteDatabase internal constructor(
             return query.sql
         }
 
-        fun selectsFor(strings: Set<String?>): Boolean {
-            for (table in tables) {
-                if (strings.contains(table)) {
-                    return true
-                }
-            }
-            return false
-        }
+        fun versionsFor(tableVersions: Map<String, Long>): List<Long?> = tables.map { table -> tableVersions[table] }
     }
 
     companion object {

@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -967,7 +968,6 @@ class KiteDatabaseTest {
         val query = db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES)
         db.withTransaction {
             query.test {
-                awaitItem()
                 Truth.assertThat(awaitError())
                     .hasMessageThat()
                     .contains("Cannot subscribe to observable query in a transaction.")
@@ -1015,6 +1015,35 @@ class KiteDatabaseTest {
             withTimeoutOrNull(5_000) { employeeCount.await() }
         }
         Truth.assertThat(count).isEqualTo(3)
+    }
+
+    @Test
+    fun queryWithNoTablesEmitsOnlyItsInitialValue() = testScope.runTest {
+        db.createQuery(emptyList(), TestDb.SELECT_EMPLOYEES).test {
+            awaitItemAndRunQuery()
+                .hasRow("alice", "Alice Allison")
+                .hasRow("bob", "Bob Bobberson")
+                .hasRow("eve", "Eve Evenson")
+                .isExhausted()
+            db.insert(TestDb.TABLE_EMPLOYEE, SQLiteDatabase.CONFLICT_NONE, TestDb.employee("john", "John Johnson"))
+            db.sendTableTrigger(emptySet())
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun queryNotNotifiedByTriggerForAnotherTable() = testScope.runTest {
+        db.createQuery(TestDb.TABLE_EMPLOYEE, TestDb.SELECT_EMPLOYEES).test {
+            awaitItemAndRunQuery()
+                .hasRow("alice", "Alice Allison")
+                .hasRow("bob", "Bob Bobberson")
+                .hasRow("eve", "Eve Evenson")
+                .isExhausted()
+            db.sendTableTrigger(TestDb.TABLE_MANAGER)
+            advanceUntilIdle()
+            expectNoEvents()
+        }
     }
 
     @Test
